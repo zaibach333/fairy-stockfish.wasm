@@ -395,14 +395,40 @@ Variant* VariantParser<DoCheck>::parse(Variant* v) {
         if (pv != config.end())
         {
             char token;
-            size_t idx = 0;
             std::stringstream ss(pv->second);
-            while (!ss.eof() && ss >> token && (idx = v->pieceToChar.find(toupper(token))) != std::string::npos
-                             && ss >> token && ss >> v->pieceValue[phase][idx]) {}
-            if (DoCheck && idx == std::string::npos)
-                std::cerr << optionName << " - Invalid piece type: " << token << std::endl;
-            else if (DoCheck && !ss.eof())
-                std::cerr << optionName << " - Invalid piece value for type: " << v->pieceToChar[idx] << std::endl;
+            while (!ss.eof())
+            {
+                if (!(ss >> token)) break;
+                // Try 2-char piece code (e.g. Ln:3800) when multiCharPieceMap is populated
+                if (!v->multiCharPieceMap.empty() && isalpha((unsigned char)token))
+                {
+                    char c2 = (char)ss.peek();
+                    if (isalpha((unsigned char)c2))
+                    {
+                        ss.get(c2);
+                        std::string code2 = {token, c2};
+                        auto it = v->multiCharPieceMap.find(code2);
+                        if (it != v->multiCharPieceMap.end())
+                        {
+                            char sep; ss >> sep;
+                            int rawVal;
+                            if (ss >> rawVal)
+                                v->pieceValue[phase][it->second] = Value(rawVal);
+                            continue;
+                        }
+                        ss.putback(c2);
+                    }
+                }
+                // Single-char fallback
+                size_t idx = v->pieceToChar.find(toupper((unsigned char)token));
+                if (idx != std::string::npos)
+                {
+                    char sep; ss >> sep;
+                    int rawVal;
+                    if (ss >> rawVal)
+                        v->pieceValue[phase][idx] = Value(rawVal);
+                }
+            }
         }
     }
 

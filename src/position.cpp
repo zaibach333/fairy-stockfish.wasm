@@ -320,12 +320,17 @@ Position& Position::set(const Variant* v, const string& fenStr, bool isChess960,
       }
 
       // Multi-char piece code: <X or <XX = white, >X or >XX = black
+      // Optional '+' after color marker means promoted: <+S, >+DK, etc.
       else if ((token == '<' || token == '>') && var->useMultiCharFen)
       {
           Color c = (token == '<') ? WHITE : BLACK;
+          // Consume optional '+' promotion prefix
+          bool promoted = (ss.peek() == '+');
+          if (promoted) { char p; ss.get(p); }
           char c1;
           if (ss.get(c1))
           {
+              PieceType pt = NO_PIECE_TYPE;
               // Try 2-char code first if next char is alpha
               char c2 = ss.peek();
               if (isalpha((unsigned char)c2))
@@ -335,29 +340,32 @@ Position& Position::set(const Variant* v, const string& fenStr, bool isChess960,
                   auto it = var->multiCharPieceMap.find(code2);
                   if (it != var->multiCharPieceMap.end())
                   {
-                      put_piece(make_piece(c, it->second), sq);
-                      ++sq;
-                      continue;
+                      pt = it->second;
                   }
-                  ss.putback(c2);
+                  if (pt == NO_PIECE_TYPE)
+                      ss.putback(c2);
               }
-              // Try 1-char code in multiCharPieceMap
-              std::string code1(1, c1);
-              auto it = var->multiCharPieceMap.find(code1);
-              if (it != var->multiCharPieceMap.end())
+              if (pt == NO_PIECE_TYPE)
               {
-                  put_piece(make_piece(c, it->second), sq);
-                  ++sq;
+                  // Try 1-char code in multiCharPieceMap
+                  std::string code1(1, c1);
+                  auto it = var->multiCharPieceMap.find(code1);
+                  if (it != var->multiCharPieceMap.end())
+                      pt = it->second;
               }
               // Fallback: standard single-char piece lookup (for predefined pieces)
-              else
+              if (pt == NO_PIECE_TYPE)
               {
                   size_t pidx = piece_to_char().find(toupper((unsigned char)c1));
                   if (pidx != string::npos)
-                  {
-                      put_piece(make_piece(c, type_of(Piece(pidx))), sq);
-                      ++sq;
-                  }
+                      pt = type_of(Piece(pidx));
+              }
+              if (pt != NO_PIECE_TYPE)
+              {
+                  if (promoted && promoted_piece_type(pt))
+                      pt = promoted_piece_type(pt);
+                  put_piece(make_piece(c, pt), sq);
+                  ++sq;
               }
           }
       }
@@ -2676,8 +2684,20 @@ bool Position::see_ge(Move m, Value threshold) const {
   assert(is_ok(m));
 
   // Only deal with normal moves, assume others pass a simple SEE
-  if (type_of(m) != NORMAL && type_of(m) != DROP && type_of(m) != PIECE_PROMOTION)
+  if (type_of(m) != NORMAL && type_of(m) != DROP && type_of(m) != PIECE_PROMOTION) {
+      // For lion double-moves, estimate SEE from the value(s) of any captured pieces
+      // so qsearch doesn't discard them as if they were zero-value moves.
+      if (type_of(m) == LION_MOVE || type_of(m) == LION_DOG_MOVE) {
+          Value gain = VALUE_ZERO;
+          if (has_mid_capture(m))
+              gain += PieceValue[MG][piece_on(mid_sq(m))];
+          Square to = to_sq(m), from = from_sq(m);
+          if (piece_on(to) != NO_PIECE && to != from)
+              gain += PieceValue[MG][piece_on(to)];
+          return gain >= threshold;
+      }
       return VALUE_ZERO >= threshold;
+  }
 
   Square from = from_sq(m), to = to_sq(m);
 
