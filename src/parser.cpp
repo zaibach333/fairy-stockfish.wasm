@@ -621,6 +621,8 @@ Variant* VariantParser<DoCheck>::parse(Variant* v) {
     parse_attribute("cambodianMoves", v->cambodianMoves);
     parse_attribute("lionMoveTypes", v->lionMoveTypes, v->pieceToChar, v->multiCharPieceMap);
     parse_attribute("lionDogMoveTypes", v->lionDogMoveTypes, v->pieceToChar, v->multiCharPieceMap);
+    parse_attribute("lionCapturingRule", v->lionCapturingRule);
+    parse_attribute("insignificantPieces", v->insignificantPieces, v->pieceToChar, v->multiCharPieceMap);
     parse_attribute("hookMoverTypes", v->hookMoverTypes, v->pieceToChar, v->multiCharPieceMap);
     parse_attribute("goblinHookTypes", v->goblinHookTypes, v->pieceToChar, v->multiCharPieceMap);
     parse_attribute("diagonalLines", v->diagonalLines);

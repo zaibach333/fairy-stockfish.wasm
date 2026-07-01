@@ -1453,6 +1453,28 @@ bool Position::pseudo_legal(const Move m) const {
       // Non-igui: destination must not be a friendly piece
       if (pieces(us) & to)
           return false;
+
+      // Chu Shogi Lion capture Rule 2: Lion captures a non-adjacent enemy Lion
+      // Rule 1 (adjacent enemy Lion) is always allowed, so only restrict distance > 1.
+      if (var->lionCapturingRule)
+      {
+          Piece destPiece = piece_on(to);
+          if (   destPiece != NO_PIECE
+              && color_of(destPiece) == ~us
+              && (var->lionMoveTypes & piece_set(type_of(destPiece)))
+              && distance(from, to) > 1)
+          {
+              // Target Lion is protected (after removing it from occupancy)?
+              Bitboard occ_no_target = pieces() ^ square_bb(to);
+              if (attackers_to(to, occ_no_target, ~us))
+              {
+                  // Only legal if a significant piece was captured at the mid-square
+                  if (!has_mid_capture(m) || (var->insignificantPieces & piece_set(mid_type(m))))
+                      return false;
+              }
+          }
+      }
+
       return true;
   }
 
@@ -1495,6 +1517,44 @@ bool Position::pseudo_legal(const Move m) const {
   }
   else if (!((capture(m) ? attacks_from(us, type_of(pc), from) : moves_from(us, type_of(pc), from)) & to))
       return false;
+
+  // Chu Shogi Lion capture Rules 2 and 3 (normal moves)
+  if (var->lionCapturingRule && (pieces(~us) & to))
+  {
+      PieceType movingPt    = type_of(pc);
+      PieceType destPt      = type_of(piece_on(to));
+      bool movingIsLion     = bool(var->lionMoveTypes & piece_set(movingPt));
+      bool destIsEnemyLion  = bool(var->lionMoveTypes & piece_set(destPt));
+
+      if (destIsEnemyLion)
+      {
+          // Rule 2: our Lion jumping non-adjacently to a protected enemy Lion (no mid-capture)
+          if (movingIsLion && distance(from, to) > 1)
+          {
+              Bitboard occ_no_target = pieces() ^ square_bb(to);
+              if (attackers_to(to, occ_no_target, ~us))
+                  return false;
+          }
+
+          // Rule 3: non-Lion capturing enemy Lion when previous opponent non-Lion took our Lion
+          if (!movingIsLion && st->previous != nullptr)
+          {
+              Piece prevCaptured = st->previous->capturedPiece;
+              if (   prevCaptured != NO_PIECE
+                  && color_of(prevCaptured) == us
+                  && (var->lionMoveTypes & piece_set(type_of(prevCaptured))))
+              {
+                  Move prevMove = st->previous->move;
+                  // If the previous mover was itself a Lion, non-Lion recapture is allowed
+                  bool prevMoverWasLion =
+                         type_of(prevMove) == LION_MOVE
+                      || bool(var->lionMoveTypes & piece_set(type_of(piece_on(to_sq(prevMove)))));
+                  if (!prevMoverWasLion)
+                      return false;
+              }
+          }
+      }
+  }
 
   // Janggi cannon
   if (type_of(pc) == JANGGI_CANNON && (pieces(JANGGI_CANNON) & (between_bb(from, to) | to)))

@@ -113,6 +113,8 @@ struct Variant {
   bool cambodianMoves = false;
   PieceSet lionMoveTypes = NO_PIECE_SET;     // piece types with Chu Shogi lion double-move
   PieceSet lionDogMoveTypes = NO_PIECE_SET;  // piece types with Dai Dai Shogi lion dog triple-move
+  bool lionCapturingRule = false;            // Chu Shogi: enforce Lion capture legality rules 1-3
+  PieceSet insignificantPieces = NO_PIECE_SET; // Chu Shogi: pieces too weak to justify Lion trading (Rule 2)
   PieceSet hookMoverTypes = NO_PIECE_SET;    // orthogonal bent rider (Hook Mover): slide orth, turn 90°, slide orth
   PieceSet goblinHookTypes = NO_PIECE_SET;   // diagonal bent rider (Long Nosed Goblin): slide diag, turn 90°, slide diag
   bool useMultiCharFen = false;              // enable 2-char piece codes in FEN (e.g., <HM for white Hook Mover)
