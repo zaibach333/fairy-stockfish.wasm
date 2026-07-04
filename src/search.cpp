@@ -88,9 +88,11 @@ namespace {
     return d > 14 ? 73 : 6 * d * d + 229 * d - 215;
   }
 
-  // Add a small random component to draw evaluations to avoid 3-fold blindness
+  // Add a small random component to draw evaluations to avoid 3-fold blindness.
+  // Subtract Contempt so the engine treats repetition/draw as slightly negative,
+  // forcing it to search for non-repeating continuations.
   Value value_draw(Thread* thisThread) {
-    return VALUE_DRAW + Value(2 * (thisThread->nodes & 1) - 1);
+    return VALUE_DRAW - Value(int(Options["Contempt"])) + Value(2 * (thisThread->nodes & 1) - 1);
   }
 
   // Skill structure is used to implement strength limit
@@ -716,7 +718,7 @@ namespace {
     {
         Value variantResult;
         if (pos.is_game_end(variantResult, ss->ply))
-            return variantResult;
+            return variantResult == VALUE_DRAW ? value_draw(pos.this_thread()) : variantResult;
 
         // Step 2. Check for aborted search and immediate draw
         if (   Threads.stop.load(std::memory_order_relaxed)
